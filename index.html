@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vocab Invaders</title>
+<style>
+:root{--bg:#f3f4f8;--fg:#1b1f2a;--muted:#5b6275;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d0f18;--fg:#e8eaf3;--muted:#9aa3bb}}
+:root[data-theme="dark"]{--bg:#0d0f18;--fg:#e8eaf3;--muted:#9aa3bb}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:860px;margin:0 auto;padding:10px}
+h1{font-size:1.2rem;margin:4px 0}
+p.help{margin:2px 0 8px;color:var(--muted);font-size:.85rem}
+#wrap{position:relative}
+canvas{width:100%;height:auto;display:block;border-radius:10px;background:#05060d;touch-action:none;cursor:crosshair}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(5,6,13,.85);color:#fff;border-radius:10px;padding:16px}
+#ov h2{margin:0 0 8px;font-size:1.6rem}#ov p{max-width:480px;margin:4px 0 14px;color:#c6cce0}
+button{font:inherit;font-weight:700;padding:10px 26px;border:0;border-radius:8px;background:#4ade80;color:#06210f;cursor:pointer}
+</style></head><body><main>
+<h1>👾 Vocab Invaders</h1>
+<p class="help">Read the definition, then shoot the invader carrying the matching word. Move: mouse, touch-drag or ← →. Fire: click, tap or Space.</p>
+<div id="wrap"><canvas id="c" width="800" height="600"></canvas>
+<div id="ov"><h2 id="t">Vocab Invaders</h2><p id="m">Shoot the word that matches the definition. Wrong shots and invaders that land cost a life. Master all 30 words to win!</p><button id="b">Start</button></div></div>
+</main>
+<script>
+const W=[["ascii","A system that gives numbers to letters and symbols."],["binary","A number system that uses only 0s and 1s."],["bit","The smallest piece of data, a 0 or 1."],["byte","A group of bits that makes one character."],["character","A letter, number, or symbol."],["code","Rules that help computers understand information."],["data","Information used by a computer."],["decimal","A number system using 0 to 9."],["delimiter","A character that separates data."],["digit","A single number from 0 to 9."],["encoding","Changing information into computer form."],["font","A style of text."],["glyph","A symbol that shows a character."],["hexadecimal","A number system using 0–9 and A–F."],["input","Information put into a computer."],["keyboard","A tool used for typing."],["letter","A symbol used in words."],["mapping","Matching characters to numbers."],["number","A symbol that shows a value."],["nonprintable","A character that cannot be seen on screen."],["output","Information that comes out of a computer."],["printable","Characters that can be seen on screen."],["registry","A list of system settings."],["symbol","A mark that stands for something."],["table","A chart with rows and columns."],["text","Written words or characters."],["transfer","Moving data from one place to another."],["translation","Changing data into another form."],["unicode","A system with many characters from many languages."],["value","A number or meaning."]];
+const cv=document.getElementById('c'),g=cv.getContext('2d'),ov=document.getElementById('ov');
+let score,lives,streak,pool,target,inv,bul,fx,ship,keys={},run=false,frame=0,msg='',msgC='#fff',msgT=0,dir=1,wave=0,cool=0;
+const stars=Array.from({length:70},()=>({x:Math.random()*800,y:Math.random()*600,s:Math.random()*1.5+.5}));
+const rnd=n=>Math.floor(Math.random()*n);
+function start(){score=0;lives=3;streak=0;pool=W.map((_,i)=>i);ship={x:400,y:560};bul=[];fx=[];wave=0;run=true;ov.style.display='none';newWave()}
+function say(t,c){msg=t;msgC=c;msgT=240}
+function newWave(){
+  if(!pool.length)return end(true);
+  target=pool[rnd(pool.length)];wave++;
+  const ids=[target];while(ids.length<6){const i=rnd(W.length);if(!ids.includes(i))ids.push(i)}
+  ids.sort(()=>Math.random()-.5);
+  inv=ids.map((id,k)=>({id,x:20+k*128,y:90,w:112,h:44}));dir=1;
+}
+function end(win){
+  run=false;ov.style.display='flex';
+  document.getElementById('t').textContent=win?'🏆 You mastered all 30 words!':'Game over';
+  document.getElementById('m').textContent='Final score: '+score+'. Words mastered: '+(30-pool.length)+' of 30.';
+  document.getElementById('b').textContent='Play again';
+}
+function boom(x,y,c){for(let i=0;i<22;i++){const a=Math.random()*6.28,s=Math.random()*4+1;fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:30,c})}}
+function loseLife(why){lives--;streak=0;say(why,'#f87171');if(lives<=0)end(false)}
+function fire(){if(!run||cool>0)return;bul.push({x:ship.x,y:ship.y-20});cool=14}
+function update(){
+  frame++;cool--;
+  if(keys.ArrowLeft)ship.x-=7;if(keys.ArrowRight)ship.x+=7;
+  ship.x=Math.max(25,Math.min(775,ship.x));
+  const sp=1+wave*.04+(30-pool.length)*.03;
+  let edge=false;
+  inv.forEach(v=>{v.x+=dir*sp;if(v.x<8||v.x+v.w>792)edge=true});
+  if(edge){dir*=-1;inv.forEach(v=>v.y+=22)}
+  bul.forEach(b=>b.y-=11);bul=bul.filter(b=>b.y>-10);
+  for(const b of bul){for(const v of inv){
+    if(b.x>v.x&&b.x<v.x+v.w&&b.y>v.y&&b.y<v.y+v.h){
+      b.y=-99;
+      if(v.id===target){
+        streak++;score+=10+Math.min(streak,10)*2;pool=pool.filter(i=>i!==target);
+        boom(v.x+v.w/2,v.y+20,'#4ade80');say('✓ '+W[target][0]+' — '+W[target][1],'#4ade80');newWave();
+      }else{
+        boom(v.x+v.w/2,v.y+20,'#f87171');inv=inv.filter(x=>x!==v);
+        loseLife('✗ That was “'+W[v.id][0]+'”: '+W[v.id][1]);
+      }
+      break}
+    }if(!run||!inv.length)break}
+  if(run&&inv.some(v=>v.y+v.h>520)){
+    const t=inv.find(v=>v.id===target);
+    if(t)loseLife('The answer was “'+W[target][0]+'”.');
+    else loseLife('Too low!');
+    if(run)newWave();
+  }
+  fx.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.l--});fx=fx.filter(p=>p.l>0);
+  if(msgT>0)msgT--;
+}
+function wrap(t,x,y,mw,lh){const ws=t.split(' ');let l='';for(const w of ws){if(g.measureText(l+w).width>mw){g.fillText(l,x,y);y+=lh;l=''}l+=w+' '}g.fillText(l,x,y);return y}
+function draw(){
+  g.fillStyle='#05060d';g.fillRect(0,0,800,600);
+  stars.forEach(s=>{s.y=(s.y+s.s*.3)%600;g.fillStyle='rgba(255,255,255,.6)';g.fillRect(s.x,s.y,s.s,s.s)});
+  g.textAlign='center';
+  g.fillStyle='#fff';g.font='bold 16px system-ui';g.textAlign='left';
+  g.fillText('Score '+score,14,24);g.textAlign='center';g.fillText('Mastered '+(30-(pool||[]).length)+'/30',400,24);
+  g.textAlign='right';g.fillText('Lives '+'❤️'.repeat(Math.max(lives||0,0)),786,24);
+  if(!run&&!inv)return;
+  g.textAlign='center';g.fillStyle='#fde68a';g.font='bold 17px system-ui';
+  wrap('Which word means: '+W[target][1],400,52,740,20);
+  inv.forEach((v,k)=>{
+    const w=Math.sin(frame/10+k)*3,cx=v.x+v.w/2;
+    g.fillStyle=['#a78bfa','#38bdf8','#f472b6','#fb923c','#34d399','#facc15'][k%6];
+    g.beginPath();g.roundRect(v.x,v.y,v.w,v.h,12);g.fill();
+    g.fillRect(v.x+14,v.y-8,8,10);g.fillRect(v.x+v.w-22,v.y-8,8,10);
+    g.fillRect(v.x+16+w,v.y+v.h,10,8);g.fillRect(v.x+v.w-26-w,v.y+v.h,10,8);
+    g.fillStyle='#10121c';g.font='bold 15px system-ui';g.fillText(W[v.id][0],cx,v.y+v.h/2+5);
+  });
+  g.fillStyle='#fff';bul.forEach(b=>g.fillRect(b.x-2,b.y,4,14));
+  fx.forEach(p=>{g.globalAlpha=p.l/30;g.fillStyle=p.c;g.fillRect(p.x,p.y,4,4)});g.globalAlpha=1;
+  g.fillStyle='#4ade80';g.beginPath();g.moveTo(ship.x,ship.y-22);g.lineTo(ship.x+24,ship.y+10);g.lineTo(ship.x+8,ship.y+4);g.lineTo(ship.x-8,ship.y+4);g.lineTo(ship.x-24,ship.y+10);g.closePath();g.fill();
+  g.strokeStyle='rgba(248,113,113,.4)';g.setLineDash([6,6]);g.beginPath();g.moveTo(0,520);g.lineTo(800,520);g.stroke();g.setLineDash([]);
+  if(msgT>0){g.globalAlpha=Math.min(1,msgT/30);g.fillStyle=msgC;g.font='bold 14px system-ui';wrap(msg,400,500,760,18);g.globalAlpha=1}
+}
+function loop(){if(run)update();draw();requestAnimationFrame(loop)}
+function px(e){const r=cv.getBoundingClientRect();return(e.clientX-r.left)*800/r.width}
+cv.addEventListener('pointermove',e=>{if(run)ship.x=px(e)});
+cv.addEventListener('pointerdown',e=>{if(run){ship.x=px(e);fire()}});
+addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '){e.preventDefault();fire()}if(e.key.startsWith('Arrow'))e.preventDefault()});
+addEventListener('keyup',e=>keys[e.key]=false);
+document.getElementById('b').onclick=start;
+loop();
+</script></body></html>
